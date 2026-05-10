@@ -1,26 +1,46 @@
 "use client";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Chart, LineController, LineElement, PointElement,
   LinearScale, CategoryScale, Tooltip, Legend, Filler
 } from "chart.js";
+import styles from "../app/page.module.css";
 
 Chart.register(LineController, LineElement, PointElement, LinearScale, CategoryScale, Tooltip, Legend, Filler);
 
 export default function WaveformChart({ data, data2, canal, label1, label2 }) {
   const canvasRef = useRef(null);
   const chartRef  = useRef(null);
+  const [range, setRange] = useState({ start: 0, end: 100 });
 
   useEffect(() => {
-    if (!canvasRef.current || !data?.length) return;
+    setRange({ start: 0, end: 100 });
+  }, [data, canal]);
+
+  const visibleData = useMemo(() => {
+    if (!data?.length) return [];
+    const startIndex = Math.floor((range.start / 100) * data.length);
+    const endIndex = Math.max(startIndex + 1, Math.ceil((range.end / 100) * data.length));
+    return data.slice(startIndex, endIndex);
+  }, [data, range]);
+
+  const visibleData2 = useMemo(() => {
+    if (!data2?.length) return [];
+    const startIndex = Math.floor((range.start / 100) * data2.length);
+    const endIndex = Math.max(startIndex + 1, Math.ceil((range.end / 100) * data2.length));
+    return data2.slice(startIndex, endIndex);
+  }, [data2, range]);
+
+  useEffect(() => {
+    if (!canvasRef.current || !visibleData.length) return;
 
     if (chartRef.current) chartRef.current.destroy();
 
     const MAX_POINTS = 2000;
-    const paso = Math.max(1, Math.floor(data.length / MAX_POINTS));
-    const sampled = data.filter((_, i) => i % paso === 0);
+    const paso = Math.max(1, Math.floor(visibleData.length / MAX_POINTS));
+    const sampled = visibleData.filter((_, i) => i % paso === 0);
 
-    const labels   = sampled.map(p => p.tiempo_s.toExponential(2));
+    const labels   = sampled.map(p => Number(p.tiempo_s).toExponential(2));
     const voltajes = sampled.map(p => p.voltaje_v);
 
     const datasets = [{
@@ -34,11 +54,11 @@ export default function WaveformChart({ data, data2, canal, label1, label2 }) {
       tension:         0.3,
     }];
 
-    if (data2?.length) {
-      const paso2 = Math.max(1, Math.floor(data2.length / MAX_POINTS));
-      const sampled2 = data2.filter((_, i) => i % paso2 === 0);
+    if (visibleData2.length) {
+      const paso2 = Math.max(1, Math.floor(visibleData2.length / MAX_POINTS));
+      const sampled2 = visibleData2.filter((_, i) => i % paso2 === 0);
       datasets.push({
-        label:       label2 || "Comparación",
+        label:       label2 || "Comparacion",
         data:        sampled2.map(p => p.voltaje_v),
         borderColor: "#f59e0b",
         backgroundColor: "rgba(245,158,11,0.05)",
@@ -69,7 +89,7 @@ export default function WaveformChart({ data, data2, canal, label1, label2 }) {
             bodyColor:       "#94a3b8",
             callbacks: {
               title: items => `t = ${items[0].label} s`,
-              label: item => ` ${item.dataset.label}: ${item.raw.toFixed(4)} V`,
+              label: item => ` ${item.dataset.label}: ${Number(item.raw).toFixed(4)} V`,
             }
           }
         },
@@ -92,19 +112,57 @@ export default function WaveformChart({ data, data2, canal, label1, label2 }) {
     });
 
     return () => { if (chartRef.current) chartRef.current.destroy(); };
-  }, [data, data2, label1, label2, canal]);
+  }, [visibleData, visibleData2, label1, label2, canal]);
+
+  const updateStart = (value) => {
+    const nextStart = Math.min(Number(value), range.end - 1);
+    setRange(current => ({ ...current, start: nextStart }));
+  };
+
+  const updateEnd = (value) => {
+    const nextEnd = Math.max(Number(value), range.start + 1);
+    setRange(current => ({ ...current, end: nextEnd }));
+  };
 
   if (!data?.length) {
     return (
-      <div style={{ padding: "3rem", textAlign: "center", color: "var(--text3)", fontSize: 13 }}>
-        Sin datos de forma de onda para esta sesión.
+      <div className={styles.chartEmpty}>
+        Sin datos de forma de onda para esta sesion.
       </div>
     );
   }
 
   return (
-    <div style={{ padding: "1rem", height: 320 }}>
-      <canvas ref={canvasRef} />
+    <div className={styles.chartShell}>
+      <div className={styles.chartCanvas}>
+        <canvas ref={canvasRef} />
+      </div>
+      <div className={styles.zoomControls}>
+        <div className={styles.zoomHeader}>
+          <span>Zoom de muestras</span>
+          <strong>{range.start}% - {range.end}%</strong>
+        </div>
+        <label className={styles.rangeRow}>
+          Inicio
+          <input
+            type="range"
+            min="0"
+            max="99"
+            value={range.start}
+            onChange={e => updateStart(e.target.value)}
+          />
+        </label>
+        <label className={styles.rangeRow}>
+          Fin
+          <input
+            type="range"
+            min="1"
+            max="100"
+            value={range.end}
+            onChange={e => updateEnd(e.target.value)}
+          />
+        </label>
+      </div>
     </div>
   );
 }

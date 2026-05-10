@@ -31,6 +31,23 @@
   font-size: 22px;
 }
 
+.statusDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.08);
+}
+
+.statusOnline {
+  background: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.16);
+}
+
+.statusOffline {
+  background: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.16);
+}
+
 .sideSection {
   padding: 1rem 1rem 0;
 }
@@ -62,7 +79,7 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  max-height: calc(100vh - 320px);
+  max-height: calc(100vh - 370px);
   overflow-y: auto;
   padding-right: 2px;
 }
@@ -71,14 +88,23 @@
   position: relative;
   background: var(--bg3);
   border: 1px solid var(--border);
+  border-left: 3px solid transparent;
   border-radius: var(--radius);
-  padding: 10px 30px 10px 12px;
+  padding: 10px 30px 10px 10px;
   cursor: pointer;
-  transition: border-color 0.15s;
+  transition: border-color 0.15s, background 0.15s, transform 0.15s;
 }
 
-.sesionItem:hover { border-color: var(--accent); }
-.sesionItem.active { border-color: var(--accent); background: rgba(79,142,247,0.08); }
+.sesionItem:hover {
+  border-color: var(--accent);
+  transform: translateX(1px);
+}
+
+.sesionItem.active {
+  border-color: var(--accent);
+  border-left-color: var(--accent);
+  background: rgba(79,142,247,0.08);
+}
 
 .sesionNombre {
   font-size: 13px;
@@ -242,4 +268,223 @@
   text-align: center;
   color: var(--text3);
   font-size: 13px;
+}
+
+.btnLive {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--text2);
+  border-radius: var(--radius);
+  padding: 7px 13px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btnLive:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.liveActive {
+  border-color: rgba(34,197,94,0.45);
+  color: #22c55e;
+  background: rgba(34,197,94,0.08);
+}
+
+.liveDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--text3);
+}
+
+.liveDotActive {
+  background: #22c55e;
+  animation: pulseDot 1.4s ease-out infinite;
+}
+
+.statsBar {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.statsCard {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 13px 16px;
+}
+
+.statsLabel {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text3);
+  margin-bottom: 7px;
+}
+
+.statsCard strong {
+  color: var(--text);
+  font-size: 18px;
+  line-height: 1.1;
+}
+
+.metricCard {
+  position: relative;
+  background: var(--metric-bg);
+  border: 1px solid var(--metric-border);
+  border-radius: var(--radius-lg);
+  padding: 14px 16px;
+  animation: fadeSlideUp 0.36s ease both;
+  animation-delay: var(--metric-delay);
+}
+
+.metricCard::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  width: max-content;
+  max-width: 220px;
+  background: #111827;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text2);
+  font-size: 12px;
+  line-height: 1.35;
+  padding: 8px 10px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 0);
+  transition: opacity 0.15s, transform 0.15s;
+  z-index: 20;
+  box-shadow: 0 12px 30px rgba(0,0,0,0.25);
+}
+
+.metricCard:hover::after {
+  opacity: 1;
+  transform: translate(-50%, -6px);
+}
+
+.metricLabel {
+  font-size: 11px;
+  color: var(--text3);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 6px;
+}
+
+.metricValue {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--metric-text);
+  line-height: 1;
+}
+
+.metricValue span {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text3);
+  margin-left: 4px;
+}
+
+.waveformCard {
+  background:
+    radial-gradient(circle at 12% 0%, rgba(79,142,247,0.13), transparent 28%),
+    linear-gradient(135deg, rgba(79,142,247,0.08), rgba(34,197,94,0.04) 45%, rgba(245,158,11,0.06)),
+    var(--bg2);
+}
+
+.chartShell {
+  padding: 1rem;
+}
+
+.chartCanvas {
+  height: 320px;
+}
+
+.chartEmpty {
+  padding: 3rem;
+  text-align: center;
+  color: var(--text3);
+  font-size: 13px;
+}
+
+.zoomControls {
+  margin-top: 14px;
+  padding: 12px;
+  background: rgba(15, 23, 42, 0.32);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: var(--radius);
+}
+
+.zoomHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  color: var(--text3);
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.zoomHeader strong {
+  color: var(--text2);
+  font-size: 12px;
+}
+
+.rangeRow {
+  display: grid;
+  grid-template-columns: 52px 1fr;
+  align-items: center;
+  gap: 10px;
+  color: var(--text3);
+  font-size: 12px;
+}
+
+.rangeRow + .rangeRow {
+  margin-top: 8px;
+}
+
+.rangeRow input {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+@keyframes pulseDot {
+  0% { box-shadow: 0 0 0 0 rgba(34,197,94,0.45); }
+  70% { box-shadow: 0 0 0 8px rgba(34,197,94,0); }
+  100% { box-shadow: 0 0 0 0 rgba(34,197,94,0); }
+}
+
+@keyframes fadeSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 900px) {
+  .statsBar {
+    grid-template-columns: 1fr;
+  }
+
+  .topActions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
 }

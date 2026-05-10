@@ -1,4 +1,6 @@
-export default function MedicionesCard({ label, value, unit, color }) {
+import styles from "../app/page.module.css";
+
+export default function MedicionesCard({ label, value, unit, color, index = 0, tooltip }) {
   const colors = {
     accent: { bg: "rgba(79,142,247,0.1)", border: "rgba(79,142,247,0.3)", text: "#4f8ef7" },
     green:  { bg: "rgba(34,197,94,0.1)",  border: "rgba(34,197,94,0.3)",  text: "#22c55e" },
@@ -10,24 +12,29 @@ export default function MedicionesCard({ label, value, unit, color }) {
 
   const fmt = (v) => {
     if (v == null) return "N/D";
-    if (Math.abs(v) >= 1000) return (v / 1000).toFixed(2) + "k";
-    if (Math.abs(v) < 0.001) return (v * 1000).toFixed(2) + "m";
-    return v.toFixed(4);
+    const number = Number(v);
+    if (!Number.isFinite(number)) return "N/D";
+    if (Math.abs(number) >= 1000) return (number / 1000).toFixed(2) + "k";
+    if (Math.abs(number) < 0.001 && number !== 0) return (number * 1000).toFixed(2) + "m";
+    return number.toFixed(4);
   };
 
   return (
-    <div style={{
-      background:   c.bg,
-      border:       `1px solid ${c.border}`,
-      borderRadius: "var(--radius-lg)",
-      padding:      "14px 16px",
-    }}>
-      <p style={{ fontSize: 11, color: "var(--text3)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
-        {label}
-      </p>
-      <p style={{ fontSize: 22, fontWeight: 700, color: c.text, lineHeight: 1 }}>
+    <div
+      className={styles.metricCard}
+      data-tooltip={tooltip}
+      title={tooltip}
+      style={{
+        "--metric-bg": c.bg,
+        "--metric-border": c.border,
+        "--metric-text": c.text,
+        "--metric-delay": `${index * 60}ms`,
+      }}
+    >
+      <p className={styles.metricLabel}>{label}</p>
+      <p className={styles.metricValue}>
         {fmt(value)}
-        <span style={{ fontSize: 13, fontWeight: 400, color: "var(--text3)", marginLeft: 4 }}>{unit}</span>
+        <span>{unit}</span>
       </p>
     </div>
   );

@@ -7,6 +7,17 @@ import MedicionesCard from "../components/MedicionesCard";
 import ConfigTable from "../components/ConfigTable";
 import styles from "./page.module.css";
 
+const BASE = "http://localhost:3001/api";
+
+const getNewestSession = (items) => {
+  if (!Array.isArray(items) || items.length === 0) return null;
+  return [...items].sort((a, b) => {
+    const dateA = new Date(a.created_at || 0).getTime();
+    const dateB = new Date(b.created_at || 0).getTime();
+    return dateB - dateA || b.id - a.id;
+  })[0];
+};
+
 export default function Dashboard() {
   const [sesiones, setSesiones]       = useState([]);
   const [sesionId, setSesionId]       = useState(null);
@@ -15,13 +26,14 @@ export default function Dashboard() {
   const [canalActivo, setCanalActivo] = useState("CH1");
   const [loading, setLoading]         = useState(false);
   const [filtroFecha, setFiltroFecha] = useState("");
+  const [filtroNombre, setFiltroNombre] = useState("");
   const [comparar, setComparar]       = useState(false);
   const [sesion2Id, setSesion2Id]     = useState(null);
   const [waveform2, setWaveform2]     = useState([]);
+  const [live, setLive]               = useState(false);
+  const [backendOnline, setBackendOnline] = useState(false);
 
-  const BASE = "http://localhost:3001/api";
-
-  const fetchSesiones = useCallback(async () => {
+  const fetchSesiones = useCallback(async (selectNewest = false) => {
     try {
       const res = await fetch(`${BASE}/sesiones`);
       if (!res.ok) {
@@ -30,15 +42,44 @@ export default function Dashboard() {
         return;
       }
       const data = await res.json();
-      setSesiones(Array.isArray(data) ? data : []);
-      if (Array.isArray(data) && data.length > 0 && !sesionId) setSesionId(data[0].id);
+      const safeData = Array.isArray(data) ? data : [];
+      const newest = getNewestSession(safeData);
+
+      setSesiones(safeData);
+      if (selectNewest && newest) {
+        setSesionId(newest.id);
+      } else if (newest) {
+        setSesionId(prev => prev || newest.id);
+      }
     } catch (err) {
       console.error("Error al obtener sesiones", err);
       setSesiones([]);
     }
-  }, [sesionId]);
+  }, []);
 
   useEffect(() => { fetchSesiones(); }, [fetchSesiones]);
+
+  useEffect(() => {
+    if (!live) return;
+    fetchSesiones(true);
+    const interval = setInterval(() => fetchSesiones(true), 5000);
+    return () => clearInterval(interval);
+  }, [live, fetchSesiones]);
+
+  useEffect(() => {
+    const checkHealth = async () => {
+      try {
+        const res = await fetch(`${BASE}/health`);
+        setBackendOnline(res.ok);
+      } catch (err) {
+        setBackendOnline(false);
+      }
+    };
+
+    checkHealth();
+    const interval = setInterval(checkHealth, 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     if (!sesionId) return;
@@ -48,7 +89,7 @@ export default function Dashboard() {
       fetch(`${BASE}/sesiones/${sesionId}/waveform?canal=${canalActivo}`),
     ]).then(async ([detRes, wavRes]) => {
       if (!detRes.ok || !wavRes.ok) {
-        throw new Error("Error al obtener detalles de sesión");
+        throw new Error("Error al obtener detalles de sesion");
       }
       const det = await detRes.json();
       const wav = await wavRes.json();
@@ -75,12 +116,16 @@ export default function Dashboard() {
       });
   }, [comparar, sesion2Id, canalActivo]);
 
-  const sesionesFiltradas = filtroFecha
-    ? sesiones.filter(s => s.created_at?.startsWith(filtroFecha))
-    : sesiones;
+  const sesionesFiltradas = sesiones.filter(s => {
+    const matchesDate = filtroFecha ? s.created_at?.startsWith(filtroFecha) : true;
+    const matchesName = filtroNombre
+      ? s.nombre?.toLowerCase().includes(filtroNombre.toLowerCase())
+      : true;
+    return matchesDate && matchesName;
+  });
 
   const handleDelete = async (id) => {
-    if (!confirm("¿Eliminar esta sesión?")) return;
+    if (!confirm("Eliminar esta sesion?")) return;
     await fetch(`${BASE}/sesiones/${id}`, { method: "DELETE" });
     fetchSesiones();
     if (sesionId === id) { setSesionId(null); setDetalle(null); setWaveform([]); }
@@ -102,6 +147,13 @@ export default function Dashboard() {
   };
 
   const medicionSesion = detalle?.mediciones?.find(m => m.canal === canalActivo);
+  const ultimaCaptura = getNewestSession(sesiones);
+  const frecuencias = detalle?.mediciones
+    ?.map(m => Number(m.frecuencia_hz))
+    .filter(v => Number.isFinite(v)) || [];
+  const frecuenciaPromedio = frecuencias.length
+    ? frecuencias.reduce((acc, value) => acc + value, 0) / frecuencias.length
+    : null;
 
   return (
     <div className={styles.layout}>
@@ -109,7 +161,11 @@ export default function Dashboard() {
       {/* SIDEBAR */}
       <aside className={styles.sidebar}>
         <div className={styles.logo}>
-          <span className={styles.logoIcon}>⌇</span>
+          <span className={styles.logoIcon}>W</span>
+          <span
+            className={`${styles.statusDot} ${backendOnline ? styles.statusOnline : styles.statusOffline}`}
+            title={backendOnline ? "Backend conectado" : "Backend sin respuesta"}
+          />
           <span>WaveAnalytics</span>
         </div>
 
@@ -120,6 +176,14 @@ export default function Dashboard() {
             className={styles.input}
             value={filtroFecha}
             onChange={e => setFiltroFecha(e.target.value)}
+          />
+          <p className={styles.sideLabel}>Buscar por nombre</p>
+          <input
+            type="search"
+            className={styles.input}
+            placeholder="Nombre de captura"
+            value={filtroNombre}
+            onChange={e => setFiltroNombre(e.target.value)}
           />
         </div>
 
@@ -134,17 +198,17 @@ export default function Dashboard() {
               >
                 <div className={styles.sesionNombre}>{s.nombre}</div>
                 <div className={styles.sesionMeta}>
-                  {s.created_at ? format(new Date(s.created_at), "dd MMM HH:mm", { locale: es }) : "—"}
-                  &nbsp;·&nbsp;{s.total_puntos?.toLocaleString()} pts
+                  {s.created_at ? format(new Date(s.created_at), "dd MMM HH:mm", { locale: es }) : "-"}
+                  &nbsp;-&nbsp;{s.total_puntos?.toLocaleString()} pts
                 </div>
                 <button
                   className={styles.btnDelete}
                   onClick={e => { e.stopPropagation(); handleDelete(s.id); }}
-                >✕</button>
+                >x</button>
               </div>
             ))}
             {sesionesFiltradas.length === 0 && (
-              <p className={styles.empty}>Sin capturas aún.<br/>Ejecuta el script Python.</p>
+              <p className={styles.empty}>Sin capturas aun.<br/>Ejecuta el script Python.</p>
             )}
           </div>
         </div>
@@ -185,6 +249,14 @@ export default function Dashboard() {
             )}
           </div>
           <div className={styles.topActions}>
+            <button
+              className={`${styles.btnLive} ${live ? styles.liveActive : ""}`}
+              onClick={() => setLive(value => !value)}
+              type="button"
+            >
+              <span className={`${styles.liveDot} ${live ? styles.liveDotActive : ""}`} />
+              Live
+            </button>
             <div className={styles.canalToggle}>
               {["CH1", "CH2"].map(ch => (
                 <button
@@ -200,22 +272,43 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* MÉTRICAS */}
+        <div className={styles.statsBar}>
+          <div className={styles.statsCard}>
+            <span className={styles.statsLabel}>Total capturas</span>
+            <strong>{sesiones.length.toLocaleString()}</strong>
+          </div>
+          <div className={styles.statsCard}>
+            <span className={styles.statsLabel}>Última captura</span>
+            <strong>
+              {ultimaCaptura?.created_at
+                ? format(new Date(ultimaCaptura.created_at), "dd MMM HH:mm", { locale: es })
+                : "N/D"}
+            </strong>
+          </div>
+          <div className={styles.statsCard}>
+            <span className={styles.statsLabel}>Frecuencia promedio</span>
+            <strong>
+              {frecuenciaPromedio == null ? "N/D" : `${frecuenciaPromedio.toFixed(2)} Hz`}
+            </strong>
+          </div>
+        </div>
+
+        {/* METRICAS */}
         {medicionSesion && (
           <div className={styles.metricsGrid}>
-            <MedicionesCard label="Frecuencia" value={medicionSesion.frecuencia_hz} unit="Hz" color="accent" />
-            <MedicionesCard label="Vpp" value={medicionSesion.vpp} unit="V" color="green" />
-            <MedicionesCard label="Vrms" value={medicionSesion.vrms} unit="V" color="amber" />
-            <MedicionesCard label="Amplitud" value={medicionSesion.amplitud} unit="V" color="purple" />
-            <MedicionesCard label="Vmax" value={medicionSesion.vmax} unit="V" color="green" />
-            <MedicionesCard label="Vmin" value={medicionSesion.vmin} unit="V" color="red" />
+            <MedicionesCard label="Frecuencia" value={medicionSesion.frecuencia_hz} unit="Hz" color="accent" index={0} tooltip="Frecuencia estimada de la senal seleccionada." />
+            <MedicionesCard label="Vpp" value={medicionSesion.vpp} unit="V" color="green" index={1} tooltip="Diferencia entre el voltaje maximo y minimo." />
+            <MedicionesCard label="Vrms" value={medicionSesion.vrms} unit="V" color="amber" index={2} tooltip="Voltaje eficaz de la senal en la captura." />
+            <MedicionesCard label="Amplitud" value={medicionSesion.amplitud} unit="V" color="purple" index={3} tooltip="Mitad del voltaje pico a pico." />
+            <MedicionesCard label="Vmax" value={medicionSesion.vmax} unit="V" color="green" index={4} tooltip="Voltaje maximo registrado en el canal activo." />
+            <MedicionesCard label="Vmin" value={medicionSesion.vmin} unit="V" color="red" index={5} tooltip="Voltaje minimo registrado en el canal activo." />
           </div>
         )}
 
-        {/* GRÁFICO ONDA */}
-        <div className={styles.card}>
+        {/* GRAFICO ONDA */}
+        <div className={`${styles.card} ${styles.waveformCard}`}>
           <div className={styles.cardHeader}>
-            <span>Forma de onda — {canalActivo}</span>
+            <span>Forma de onda - {canalActivo}</span>
             {comparar && sesion2Id && <span className={styles.badge}>Comparando</span>}
           </div>
           {loading
@@ -233,7 +326,7 @@ export default function Dashboard() {
         {/* CONFIG */}
         {detalle?.config?.length > 0 && (
           <div className={styles.card}>
-            <div className={styles.cardHeader}>Configuración del osciloscopio</div>
+            <div className={styles.cardHeader}>Configuracion del osciloscopio</div>
             <ConfigTable config={detalle.config} />
           </div>
         )}
