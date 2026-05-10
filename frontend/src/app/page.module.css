@@ -233,6 +233,7 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: 10px;
+  overflow: visible;
 }
 
 /* CARDS */
@@ -372,6 +373,15 @@
 .metricCard:hover::after {
   opacity: 1;
   transform: translate(-50%, -6px);
+}
+
+.metricCard:first-child::after {
+  left: 0;
+  transform: translate(0, 0);
+}
+
+.metricCard:first-child:hover::after {
+  transform: translate(0, -6px);
 }
 
 .metricLabel {
