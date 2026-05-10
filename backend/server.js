@@ -99,7 +99,7 @@ app.get("/api/sesiones", async (req, res) => {
        FROM sesiones s
        LEFT JOIN waveform_points wp ON wp.sesion_id = s.id
        LEFT JOIN mediciones m ON m.sesion_id = s.id
-       GROUP BY s.id
+       GROUP BY s.id, s.nombre, s.descripcion, s.created_at
        ORDER BY s.created_at DESC`
     );
     res.json(rows);

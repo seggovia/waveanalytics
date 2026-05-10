@@ -24,10 +24,18 @@ export default function Dashboard() {
   const fetchSesiones = useCallback(async () => {
     try {
       const res = await fetch(`${BASE}/sesiones`);
+      if (!res.ok) {
+        console.error("Error al obtener sesiones", res.status);
+        setSesiones([]);
+        return;
+      }
       const data = await res.json();
-      setSesiones(data);
-      if (data.length > 0 && !sesionId) setSesionId(data[0].id);
-    } catch {}
+      setSesiones(Array.isArray(data) ? data : []);
+      if (Array.isArray(data) && data.length > 0 && !sesionId) setSesionId(data[0].id);
+    } catch (err) {
+      console.error("Error al obtener sesiones", err);
+      setSesiones([]);
+    }
   }, [sesionId]);
 
   useEffect(() => { fetchSesiones(); }, [fetchSesiones]);
@@ -36,18 +44,35 @@ export default function Dashboard() {
     if (!sesionId) return;
     setLoading(true);
     Promise.all([
-      fetch(`${BASE}/sesiones/${sesionId}`).then(r => r.json()),
-      fetch(`${BASE}/sesiones/${sesionId}/waveform?canal=${canalActivo}`).then(r => r.json()),
-    ]).then(([det, wav]) => {
+      fetch(`${BASE}/sesiones/${sesionId}`),
+      fetch(`${BASE}/sesiones/${sesionId}/waveform?canal=${canalActivo}`),
+    ]).then(async ([detRes, wavRes]) => {
+      if (!detRes.ok || !wavRes.ok) {
+        throw new Error("Error al obtener detalles de sesión");
+      }
+      const det = await detRes.json();
+      const wav = await wavRes.json();
       setDetalle(det);
       setWaveform(wav);
-    }).catch(() => {}).finally(() => setLoading(false));
+    }).catch(err => {
+      console.error(err);
+      setDetalle(null);
+      setWaveform([]);
+    }).finally(() => setLoading(false));
   }, [sesionId, canalActivo]);
 
   useEffect(() => {
     if (!comparar || !sesion2Id) { setWaveform2([]); return; }
     fetch(`${BASE}/sesiones/${sesion2Id}/waveform?canal=${canalActivo}`)
-      .then(r => r.json()).then(setWaveform2).catch(() => setWaveform2([]));
+      .then(res => {
+        if (!res.ok) throw new Error("Error al obtener waveform comparativa");
+        return res.json();
+      })
+      .then(setWaveform2)
+      .catch(err => {
+        console.error(err);
+        setWaveform2([]);
+      });
   }, [comparar, sesion2Id, canalActivo]);
 
   const sesionesFiltradas = filtroFecha
